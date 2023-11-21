@@ -4,9 +4,9 @@ import sys
 from pathlib import Path
 
 def create_directories(folder_path, categories):
-    for category in categories:
-        category_path = os.path.join(folder_path, category)
-        os.makedirs(category_path, exist_ok=True)
+        for category in categories:
+             category_path = os.path.join(folder_path, category)
+             os.makedirs(category_path, exist_ok=True)
 
 
 def normalize(name):   # всі файли та папки перейменовуються за допомогою функції normalize.
@@ -17,60 +17,71 @@ def normalize(name):   # всі файли та папки перейменов�
         'ч': 'ch', 'ш': 'sh', 'щ': 'shch', 'ь': '', 'ю': 'iu', 'я': 'ia'
     }
 
-    transliterated_name = ''.join(transliteration_dict.get(char, char) for char in name.lower())
+    base_name, file_extension = os.path.splitext(name)
+
+    transliterated_name = ''.join(transliteration_dict.get(char, char) for char in base_name)
     normalize_name = ''.join('_' if not char.isalnum() else char for char in transliterated_name)
 
-    return normalize_name
+    return f"{normalize_name}{file_extension}"
 
 def move_file(source_filepath, destination_folder):
     _, filename = os.path.split(source_filepath)
-    
-    normalized_name = normalize(filename)
-    _, file_extension = os.path.splitext(filename)
-    destination_path_ext = os.path.join(destination_folder, normalized_name)
+    destination_path = os.path.join(destination_folder, normalize(filename))
+    shutil.move(source_filepath, destination_path)
 
-    if os.path.isfile(source_filepath):
-        shutil.move(source_filepath, destination_path_ext)
-    elif os.path.isdir(source_filepath):
-        if not os.listdir(source_filepath):
-            os.rmdir(source_filepath)
-        
-    
-    if file_extension.lower() in known_extensions:
-        files_by_category[destination_folder].append(destination_path_ext)
+    file_extension = os.path.splitext(filename)[1].lower()
+
+    if file_extension in {'.jpeg', '.png', '.jpg', '.svg'}:
+        category = 'images'
+    elif file_extension in {'.avi', '.mp4', '.mov', '.mkv'}:
+        category = 'video'
+    elif file_extension in {'.doc', '.docx', '.txt', '.pdf', '.xlsx', '.pptx'}:
+        category = 'documents'
+    elif file_extension in {'.mp3', '.ogg', '.wav', '.amr'}:
+        category = 'audio'
+    elif file_extension in {'.zip', '.gz', '.tar'}:
+        category = 'archives'
     else:
-        unknown_extensions.add(file_extension.lower())
+        category = 'other'
+
+    files_by_category[category].append(destination_path)
+
+    if category == 'other':
+        unknown_extensions.add(file_extension)
+    else:
+        known_extensions.add(file_extension)
+    
 
 def sort_folders(folder_path):
-    categories = ["images", "video", "documents", "audio", "archives"]
+    categories = ["images", "video", "documents", "audio", "archives", "other"]
     create_directories(folder_path, categories)
 
     for dirpath, dirnames, filenames in os.walk(folder_path):
         for filename in filenames:
             source_filepath = os.path.join(dirpath, filename)
-            
 
-            if filename.lower() != normalize(filename).lower():
-                move_file(source_filepath, os.path.join(folder_path, 'unknown'))
+            normalized_name = normalize(filename)
+            file_extension = os.path.splitext(filename)[1].lower()
+           
+
+            if file_extension in {'.jpeg', '.png', '.jpg', '.svg'}:
+                move_file(source_filepath, os.path.join(folder_path, 'images'))
+            elif file_extension in {'.avi', '.mp4', '.mov', '.mkv'}:
+                move_file(source_filepath, os.path.join(folder_path, 'video'))
+            elif file_extension in {'.doc', '.docx', '.txt', '.pdf', '.xlsx', '.pptx'}:
+                move_file(source_filepath, os.path.join(folder_path, 'documents'))
+            elif file_extension in {'.mp3', '.ogg', '.wav', '.amr'}:
+                move_file(source_filepath, os.path.join(folder_path, 'audio'))
+            elif file_extension in {'.zip', '.gz', '.tar'}:
+                move_file(source_filepath, os.path.join(folder_path, 'archives'))
             else:
-                normalized_name = normalize(filename)
-                
-                if filename != normalized_name:
-                    move_file(source_filepath, os.path.join(folder_path, 'unknown'))
-                else:
-                    file_extension = os.path.splitext(filename)[1].lower()
-        
-                    if file_extension in {'.jpeg', '.png', '.jpg', '.svg'}:
-                        move_file(source_filepath, os.path.join(folder_path, 'images'))
-                    elif file_extension in {'.avi', '.mp4', '.mov', '.mkv'}:
-                        move_file(source_filepath, os.path.join(folder_path, 'video'))
-                    elif file_extension in {'.doc', '.docx', '.txt', '.pdf', '.xlsx', '.pptx'}:
-                        move_file(source_filepath, os.path.join(folder_path, 'documents'))
-                    elif file_extension in {'.mp3', '.ogg', '.wav', '.amr'}:
-                        move_file(source_filepath, os.path.join(folder_path, 'audio'))
-                    elif file_extension in {'.zip', '.gz', '.tar'}:
-                        move_file(source_filepath, os.path.join(folder_path, 'archives'))
+                move_file(source_filepath, os.path.join(folder_path, 'other'))
 
+            if file_extension == 'other':
+                unknown_extensions.add(file_extension)
+            else:
+                known_extensions.add(file_extension)
+        
 
     for category, files in files_by_category.items():
         print(f"Files in {category}:")
@@ -84,10 +95,14 @@ def sort_folders(folder_path):
     print("\nUnknown extensions:")
     for ext in unknown_extensions:
         print(f"- {ext}")
-            
-known_extensions = {'.jpeg', '.png', '.jpg', '.svg', '.avi', '.mp4', '.mov', '.mkv',
-                    '.doc', '.docx', '.txt', '.pdf', '.xlsx', '.pptx', '.mp3', '.ogg', '.wav', '.amr',
-                    '.zip', '.gz', '.tar'}
+
+    for dirpath, dirnames, filenames in os.walk(folder_path, topdown=False):
+        for dirname in dirnames:
+            current_dir = os.path.join(dirpath, dirname)
+            if not os.listdir(current_dir):
+                os.rmdir(current_dir)
+
+known_extensions = set()
 unknown_extensions = set()
 
 files_by_category = {
@@ -96,8 +111,8 @@ files_by_category = {
     'documents': [],
     'audio': [],
     'archives': [],
+    'other': []
 }
-
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
