@@ -3,6 +3,7 @@ import shutil
 import sys
 from pathlib import Path
 
+
 def create_directories(folder_path, categories):
         for category in categories:
              category_path = os.path.join(folder_path, category)
@@ -35,16 +36,6 @@ def move_file(source_filepath, destination_folder):
     else:
         unknown_extensions.add(file_extension)
 
-def extract_archive(archive_path, extraction_path):
-    shutil.unpack_archive(archive_path, extraction_path)
-
-def move_archive_contents(source_folder, destination_folder):
-    for dirpath, dirnames, filenames in os.walk(source_folder):
-        for filename in filenames:
-            source_filepath = os.path.join(dirpath, filename)
-            destination_path = os.path.join(destination_folder, normalize(filename))
-            shutil.move(source_filepath, destination_path)
-
 def sort_folders(folder_path):
     categories = ["images", "video", "documents", "audio", "archives", "other"]
     create_directories(folder_path, categories)
@@ -56,15 +47,6 @@ def sort_folders(folder_path):
             normalized_name = normalize(filename)
 
             file_extension = os.path.splitext(filename)[1].lower()
-            if file_extension in {'.zip', '.gz', '.tar'}:
-                # Handle archives by extracting contents and moving them
-                archive_extraction_path = os.path.join(folder_path, 'archives_temp')
-                extract_archive(source_filepath, archive_extraction_path)
-                move_archive_contents(archive_extraction_path, os.path.join(folder_path, 'archives'))
-                shutil.rmtree(archive_extraction_path)  # Remove temporary extraction folder
-            else:
-                # Move other file types based on their extensions
-                move_file(source_filepath, os.path.join(folder_path, 'other'))
 
             if file_extension in {'.jpeg', '.png', '.jpg', '.svg'}:
                 move_file(source_filepath, os.path.join(folder_path, 'images'))
@@ -75,7 +57,13 @@ def sort_folders(folder_path):
             elif file_extension in {'.mp3', '.ogg', '.wav', '.amr'}:
                 move_file(source_filepath, os.path.join(folder_path, 'audio'))
             elif file_extension in {'.zip', '.gz', '.tar'}:
-                move_file(source_filepath, os.path.join(folder_path, 'archives'))
+                try:
+                    archive_name = os.path.splitext(normalized_name)[0]
+                    extract_folder = os.path.join(folder_path, 'archives', archive_name)
+                    shutil.unpack_archive(source_filepath, extract_folder)
+                    move_file(source_filepath, os.path.join(folder_path, 'archives'))
+                except shutil.ReadError:
+                    move_file(source_filepath, os.path.join(folder_path, 'other'))
             else:
                 move_file(source_filepath, os.path.join(folder_path, 'other'))
 
