@@ -2,8 +2,6 @@ import os
 import shutil
 import sys
 from pathlib import Path
-import zipfile
-import tarfile
 
 def create_directories(folder_path, categories):
         for category in categories:
@@ -32,44 +30,20 @@ def move_file(source_filepath, destination_folder):
     shutil.move(source_filepath, destination_path)
 
     file_extension = os.path.splitext(filename)[1].lower()
-
-    if file_extension in {'.jpeg', '.png', '.jpg', '.svg'}:
-        category = 'images'
-    elif file_extension in {'.avi', '.mp4', '.mov', '.mkv'}:
-        category = 'video'
-    elif file_extension in {'.doc', '.docx', '.txt', '.pdf', '.xlsx', '.pptx'}:
-        category = 'documents'
-    elif file_extension in {'.mp3', '.ogg', '.wav', '.amr'}:
-        category = 'audio'
-    elif file_extension in {'.zip', '.gz', '.tar'}:
-        category = 'archives'
-        extract_path = os.path.join(destination_folder, 'archives', os.path.splitext(normalize(filename))[0])
-        os.makedirs(extract_path, exist_ok=True)
-
-        if file_extension == '.zip':
-            try:
-                with zipfile.ZipFile(destination_path, 'r') as zip_ref:
-                    zip_ref.extractall(extract_path)
-            except zipfile.BadZipFile:
-                print(f"Warning: {filename} is not a valid zip file and will be treated as 'other'.")
-                category = 'other'
-        elif file_extension in {'.tar', '.gz'}:
-            try:
-                with tarfile.open(destination_path, 'r') as tar_ref:
-                    tar_ref.extractall(extract_path)
-            except tarfile.ReadError:
-                print(f"Warning: {filename} is not a valid tar file and will be treated as 'other'.")
-                category = 'other'
+    if file_extension in known_extensions:
+        files_by_category[destination_folder].append(destination_path)
     else:
-        category = 'other'
-   
-    files_by_category[category].append(destination_path)
-
-    if category == 'other':
         unknown_extensions.add(file_extension)
-    else:
-        known_extensions.add(file_extension)
-    
+
+def extract_archive(archive_path, extraction_path):
+    shutil.unpack_archive(archive_path, extraction_path)
+
+def move_archive_contents(source_folder, destination_folder):
+    for dirpath, dirnames, filenames in os.walk(source_folder):
+        for filename in filenames:
+            source_filepath = os.path.join(dirpath, filename)
+            destination_path = os.path.join(destination_folder, normalize(filename))
+            shutil.move(source_filepath, destination_path)
 
 def sort_folders(folder_path):
     categories = ["images", "video", "documents", "audio", "archives", "other"]
@@ -80,8 +54,17 @@ def sort_folders(folder_path):
             source_filepath = os.path.join(dirpath, filename)
 
             normalized_name = normalize(filename)
+
             file_extension = os.path.splitext(filename)[1].lower()
-           
+            if file_extension in {'.zip', '.gz', '.tar'}:
+                # Handle archives by extracting contents and moving them
+                archive_extraction_path = os.path.join(folder_path, 'archives_temp')
+                extract_archive(source_filepath, archive_extraction_path)
+                move_archive_contents(archive_extraction_path, os.path.join(folder_path, 'archives'))
+                shutil.rmtree(archive_extraction_path)  # Remove temporary extraction folder
+            else:
+                # Move other file types based on their extensions
+                move_file(source_filepath, os.path.join(folder_path, 'other'))
 
             if file_extension in {'.jpeg', '.png', '.jpg', '.svg'}:
                 move_file(source_filepath, os.path.join(folder_path, 'images'))
@@ -96,11 +79,6 @@ def sort_folders(folder_path):
             else:
                 move_file(source_filepath, os.path.join(folder_path, 'other'))
 
-            if file_extension == 'other':
-                unknown_extensions.add(file_extension)
-            else:
-                known_extensions.add(file_extension)
-        
 
     for category, files in files_by_category.items():
         print(f"Files in {category}:")
@@ -132,6 +110,7 @@ files_by_category = {
     'archives': [],
     'other': []
 }
+
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
