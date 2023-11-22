@@ -2,6 +2,8 @@ import os
 import shutil
 import sys
 from pathlib import Path
+import zipfile
+import tarfile
 
 def create_directories(folder_path, categories):
         for category in categories:
@@ -41,9 +43,26 @@ def move_file(source_filepath, destination_folder):
         category = 'audio'
     elif file_extension in {'.zip', '.gz', '.tar'}:
         category = 'archives'
+        extract_path = os.path.join(destination_folder, 'archives', os.path.splitext(normalize(filename))[0])
+        os.makedirs(extract_path, exist_ok=True)
+
+        if file_extension == '.zip':
+            try:
+                with zipfile.ZipFile(destination_path, 'r') as zip_ref:
+                    zip_ref.extractall(extract_path)
+            except zipfile.BadZipFile:
+                print(f"Warning: {filename} is not a valid zip file and will be treated as 'other'.")
+                category = 'other'
+        elif file_extension in {'.tar', '.gz'}:
+            try:
+                with tarfile.open(destination_path, 'r') as tar_ref:
+                    tar_ref.extractall(extract_path)
+            except tarfile.ReadError:
+                print(f"Warning: {filename} is not a valid tar file and will be treated as 'other'.")
+                category = 'other'
     else:
         category = 'other'
-
+   
     files_by_category[category].append(destination_path)
 
     if category == 'other':
