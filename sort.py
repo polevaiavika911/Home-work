@@ -31,10 +31,26 @@ def move_file(source_filepath, destination_folder):
     shutil.move(source_filepath, destination_path)
 
     file_extension = os.path.splitext(filename)[1].lower()
-    if file_extension in known_extensions:
-        files_by_category[destination_folder].append(destination_path)
+    if file_extension in {'.jpeg', '.png', '.jpg', '.svg'}:
+        category = 'images'
+    elif file_extension in {'.avi', '.mp4', '.mov', '.mkv'}:
+        category = 'video'
+    elif file_extension in {'.doc', '.docx', '.txt', '.pdf', '.xlsx', '.pptx'}:
+        category = 'documents'
+    elif file_extension in {'.mp3', '.ogg', '.wav', '.amr'}:
+        category = 'audio'
+    elif file_extension in {'.zip', '.gz', '.tar'}:
+        category = 'archives'
     else:
+        category = 'other'
+
+    files_by_category[category].append(normalize(filename))
+
+    if category == 'other':
         unknown_extensions.add(file_extension)
+    else:
+        known_extensions.add(file_extension)
+
 
 def sort_folders(folder_path):
     categories = ["images", "video", "documents", "audio", "archives", "other"]
@@ -110,5 +126,6 @@ if __name__ == "__main__":
     if not os.path.isdir(folder_to_sort):
         print(f"{folder_to_sort} is not a directory.")
         sys.exit(1)
+
 
     sort_folders(folder_to_sort)
